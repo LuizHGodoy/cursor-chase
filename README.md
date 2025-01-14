@@ -2,6 +2,11 @@
 
 Um jogo desafiador onde você precisa fugir do perseguidor usando seu cursor. Quanto mais tempo sobreviver, maior sua pontuação!
 
+![image](https://github.com/user-attachments/assets/e02d6e8e-a8d6-405c-b1ca-f1a3ef3d3825)
+![image](https://github.com/user-attachments/assets/9d4bfad0-c9cb-49a5-9aac-6b48ac74d7f5)
+
+
+
 ## 🎯 Como Jogar
 
 1. Digite seu nickname na tela inicial
