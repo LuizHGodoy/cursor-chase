@@ -160,14 +160,13 @@ function App() {
           const newScore = prev.score + 1 * prev.scoreMultiplier;
           const newDifficulty = Math.min(0.12, 0.04 + newScore * 0.0001);
 
-          // Adiciona um novo perseguidor a cada 50 pontos
           const shouldAddPursuer =
             Math.floor(newScore / 50) > Math.floor(prev.score / 50);
-          
+
           if (shouldAddPursuer) {
             playSound("newPursuer");
           }
-          
+
           const newPursuers = shouldAddPursuer
             ? [
                 ...prev.pursuers,
@@ -194,7 +193,6 @@ function App() {
 
       const mouseRadius = 20;
 
-      // Atualiza a posição de todos os perseguidores
       setGameState((prev) => {
         const updatedPursuers = prev.pursuers.map((pursuer) => {
           const dx = mousePos.x - pursuer.position.x;
@@ -214,7 +212,6 @@ function App() {
           };
         });
 
-        // Se algum perseguidor colidiu, retorna o estado anterior com game over
         const collidedWithPlayer = updatedPursuers.some((pursuer) => {
           const dx = mousePos.x - pursuer.position.x;
           const dy = mousePos.y - pursuer.position.y;
