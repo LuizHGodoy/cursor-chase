@@ -6,23 +6,23 @@ import { StartScreen } from "./components/StartScreen";
 import { PowerUp } from "./components/ui/PowerUp";
 import { Pursuer } from "./components/ui/Pursuer";
 import { ScoreDisplay } from "./components/ui/ScoreDisplay";
-import {
-  gameStateAtom,
-  mousePosAtom,
-  powerUpsAtom,  
-} from "./store/atoms";
+import { useSounds } from "./hooks/useSounds";
+import { gameStateAtom, mousePosAtom, powerUpsAtom } from "./store/atoms";
 import { IPowerUp } from "./types/types";
 
 function App() {
   const [gameState, setGameState] = useAtom(gameStateAtom);
   const [mousePos, setMousePos] = useAtom(mousePosAtom);
   const [powerUps, setPowerUps] = useAtom<IPowerUp[]>(powerUpsAtom);
+  const { playSound, stopSound } = useSounds();
 
   const animationFrameRef = useRef<number>();
   const lastUpdateRef = useRef<number>(0);
   const lastPowerUpSpawnRef = useRef<number>(0);
 
   const startGame = (playerName: string) => {
+    console.log("Iniciando jogo, tocando BGM...");
+    playSound("bgm");
     localStorage.setItem("playerName", playerName);
 
     setGameState({
@@ -33,11 +33,13 @@ function App() {
       lastScoreUpdate: Date.now(),
       playerName,
       scoreMultiplier: 1,
-      pursuers: [{
-        id: 'initial',
-        position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-        speed: 0.04
-      }]
+      pursuers: [
+        {
+          id: "initial",
+          position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+          speed: 0.04,
+        },
+      ],
     });
     setPowerUps([]);
   };
@@ -118,6 +120,16 @@ function App() {
     setPowerUps((prev) => [...prev, newPowerUp]);
   }, [powerUpTypes, setPowerUps]);
 
+  const handleGameOver = useCallback(() => {
+    stopSound("bgm");
+    playSound("gameOver");
+    setGameState((prev) => ({
+      ...prev,
+      isGameOver: true,
+      isPlaying: false,
+    }));
+  }, [playSound, stopSound, setGameState]);
+
   useEffect(() => {
     if (!gameState.isPlaying || gameState.isGameOver) {
       if (animationFrameRef.current) {
@@ -147,18 +159,27 @@ function App() {
         setGameState((prev) => {
           const newScore = prev.score + 1 * prev.scoreMultiplier;
           const newDifficulty = Math.min(0.12, 0.04 + newScore * 0.0001);
-          
+
           // Adiciona um novo perseguidor a cada 50 pontos
-          const shouldAddPursuer = Math.floor(newScore / 50) > Math.floor(prev.score / 50);
-          const newPursuers = shouldAddPursuer 
-            ? [...prev.pursuers, {
-                id: crypto.randomUUID(),
-                position: { 
-                  x: Math.random() * window.innerWidth,
-                  y: Math.random() * window.innerHeight
+          const shouldAddPursuer =
+            Math.floor(newScore / 50) > Math.floor(prev.score / 50);
+          
+          if (shouldAddPursuer) {
+            playSound("newPursuer");
+          }
+          
+          const newPursuers = shouldAddPursuer
+            ? [
+                ...prev.pursuers,
+                {
+                  id: crypto.randomUUID(),
+                  position: {
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                  },
+                  speed: newDifficulty,
                 },
-                speed: newDifficulty
-              }]
+              ]
             : prev.pursuers;
 
           return {
@@ -166,38 +187,35 @@ function App() {
             score: newScore,
             difficulty: newDifficulty,
             lastScoreUpdate: now,
-            pursuers: newPursuers
+            pursuers: newPursuers,
           };
         });
       }
 
       const mouseRadius = 20;
-      
+
       // Atualiza a posição de todos os perseguidores
       setGameState((prev) => {
-        const updatedPursuers = prev.pursuers.map(pursuer => {
+        const updatedPursuers = prev.pursuers.map((pursuer) => {
           const dx = mousePos.x - pursuer.position.x;
           const dy = mousePos.y - pursuer.position.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
 
           if (distance < 30) {
-            return {
-              ...pursuer,
-              isGameOver: true,
-              isPlaying: false
-            };
+            handleGameOver();
           }
 
           return {
             ...pursuer,
             position: {
               x: pursuer.position.x + dx * pursuer.speed * (deltaTime / 16),
-              y: pursuer.position.y + dy * pursuer.speed * (deltaTime / 16)
-            }
+              y: pursuer.position.y + dy * pursuer.speed * (deltaTime / 16),
+            },
           };
         });
 
-        const collidedWithPlayer = updatedPursuers.some(pursuer => {
+        // Se algum perseguidor colidiu, retorna o estado anterior com game over
+        const collidedWithPlayer = updatedPursuers.some((pursuer) => {
           const dx = mousePos.x - pursuer.position.x;
           const dy = mousePos.y - pursuer.position.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
@@ -208,13 +226,14 @@ function App() {
           return {
             ...prev,
             isGameOver: true,
-            isPlaying: false
+            isPlaying: false,
+            pursuers: updatedPursuers,
           };
         }
 
         return {
           ...prev,
-          pursuers: updatedPursuers
+          pursuers: updatedPursuers,
         };
       });
 
@@ -227,6 +246,9 @@ function App() {
         });
 
         if (collidedPowerUp) {
+          playSound(
+            collidedPowerUp.type === "score" ? "scoreBonus" : "multiplierBonus"
+          );
           setGameState((prev) => ({
             ...prev,
             score:
@@ -256,13 +278,15 @@ function App() {
   }, [
     gameState.isPlaying,
     gameState.isGameOver,
-    gameState.lastScoreUpdate,
-    gameState.difficulty,
     gameState.score,
+    gameState.lastScoreUpdate,
     mousePos,
     setGameState,
     setPowerUps,
     spawnPowerUp,
+    playSound,
+    stopSound,
+    handleGameOver,
   ]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
