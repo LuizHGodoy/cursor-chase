@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
-import { Leaderboard } from './ui/Leaderboard';
-import { saveScore } from '../store/leaderboard';
+import { useEffect } from "react";
+import { saveScore } from "../store/leaderboard";
+import { Leaderboard } from "./ui/Leaderboard";
 
 interface GameOverProps {
   score: number;
@@ -10,11 +10,15 @@ interface GameOverProps {
 
 export function GameOver({ score, playerName, onRestart }: GameOverProps) {
   useEffect(() => {
-    saveScore({
-      playerName,
-      score,
-      date: new Date().toISOString(),
-    });
+    const savedScoreKey = `saved_score_${playerName}_${score}`;
+    if (!localStorage.getItem(savedScoreKey)) {
+      saveScore({
+        playerName,
+        score,
+        date: new Date().toISOString(),
+      });
+      localStorage.setItem(savedScoreKey, "true");
+    }
   }, [playerName, score]);
 
   return (
@@ -24,7 +28,7 @@ export function GameOver({ score, playerName, onRestart }: GameOverProps) {
           <h1 className="text-4xl font-bold text-red-500 mb-4">Game Over!</h1>
           <p className="text-2xl text-white mb-2">Jogador: {playerName}</p>
           <p className="text-2xl text-white mb-8">Pontuação Final: {score}</p>
-          
+
           <button
             type="button"
             onClick={onRestart}
@@ -38,4 +42,4 @@ export function GameOver({ score, playerName, onRestart }: GameOverProps) {
       </div>
     </div>
   );
-} 
+}
