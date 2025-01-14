@@ -6,6 +6,12 @@ export interface Position {
 	y: number;
 }
 
+export interface Pursuer {
+	id: string;
+	position: Position;
+	speed: number;
+}
+
 export interface GameState {
 	score: number;
 	isGameOver: boolean;
@@ -14,6 +20,7 @@ export interface GameState {
 	lastScoreUpdate: number;
 	playerName: string;
 	scoreMultiplier: number;
+	pursuers: Pursuer[];
 }
 
 const savedPlayerName = localStorage.getItem("playerName");
@@ -26,6 +33,11 @@ export const gameStateAtom = atom<GameState>({
 	lastScoreUpdate: 0,
 	playerName: savedPlayerName || "",
 	scoreMultiplier: 1,
+	pursuers: [{
+		id: 'initial',
+		position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+		speed: 0.04
+	}]
 });
 
 export const mousePosAtom = atom<Position>({ x: 0, y: 0 });

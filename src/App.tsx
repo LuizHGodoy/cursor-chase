@@ -1,6 +1,6 @@
 import { useAtom } from "jotai";
 import type React from "react";
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { GameOver } from "./components/GameOver";
 import { StartScreen } from "./components/StartScreen";
 import { PowerUp } from "./components/ui/PowerUp";
@@ -9,15 +9,13 @@ import { ScoreDisplay } from "./components/ui/ScoreDisplay";
 import {
   gameStateAtom,
   mousePosAtom,
-  powerUpsAtom,
-  pursuerPosAtom,
+  powerUpsAtom,  
 } from "./store/atoms";
 import { IPowerUp } from "./types/types";
 
 function App() {
   const [gameState, setGameState] = useAtom(gameStateAtom);
   const [mousePos, setMousePos] = useAtom(mousePosAtom);
-  const [pursuerPos, setPursuerPos] = useAtom(pursuerPosAtom);
   const [powerUps, setPowerUps] = useAtom<IPowerUp[]>(powerUpsAtom);
 
   const animationFrameRef = useRef<number>();
@@ -35,8 +33,12 @@ function App() {
       lastScoreUpdate: Date.now(),
       playerName,
       scoreMultiplier: 1,
+      pursuers: [{
+        id: 'initial',
+        position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+        speed: 0.04
+      }]
     });
-    setPursuerPos({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
     setPowerUps([]);
   };
 
@@ -142,15 +144,80 @@ function App() {
       );
 
       if (timeSinceLastScore >= 1000) {
-        setGameState((prev) => ({
-          ...prev,
-          score: prev.score + 1 * prev.scoreMultiplier,
-          difficulty: Math.min(0.12, 0.04 + (prev.score + 1) * 0.0001),
-          lastScoreUpdate: now,
-        }));
+        setGameState((prev) => {
+          const newScore = prev.score + 1 * prev.scoreMultiplier;
+          const newDifficulty = Math.min(0.12, 0.04 + newScore * 0.0001);
+          
+          // Adiciona um novo perseguidor a cada 50 pontos
+          const shouldAddPursuer = Math.floor(newScore / 50) > Math.floor(prev.score / 50);
+          const newPursuers = shouldAddPursuer 
+            ? [...prev.pursuers, {
+                id: crypto.randomUUID(),
+                position: { 
+                  x: Math.random() * window.innerWidth,
+                  y: Math.random() * window.innerHeight
+                },
+                speed: newDifficulty
+              }]
+            : prev.pursuers;
+
+          return {
+            ...prev,
+            score: newScore,
+            difficulty: newDifficulty,
+            lastScoreUpdate: now,
+            pursuers: newPursuers
+          };
+        });
       }
 
       const mouseRadius = 20;
+      
+      // Atualiza a posição de todos os perseguidores
+      setGameState((prev) => {
+        const updatedPursuers = prev.pursuers.map(pursuer => {
+          const dx = mousePos.x - pursuer.position.x;
+          const dy = mousePos.y - pursuer.position.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (distance < 30) {
+            return {
+              ...pursuer,
+              isGameOver: true,
+              isPlaying: false
+            };
+          }
+
+          return {
+            ...pursuer,
+            position: {
+              x: pursuer.position.x + dx * pursuer.speed * (deltaTime / 16),
+              y: pursuer.position.y + dy * pursuer.speed * (deltaTime / 16)
+            }
+          };
+        });
+
+        const collidedWithPlayer = updatedPursuers.some(pursuer => {
+          const dx = mousePos.x - pursuer.position.x;
+          const dy = mousePos.y - pursuer.position.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          return distance < 30;
+        });
+
+        if (collidedWithPlayer) {
+          return {
+            ...prev,
+            isGameOver: true,
+            isPlaying: false
+          };
+        }
+
+        return {
+          ...prev,
+          pursuers: updatedPursuers
+        };
+      });
+
       setPowerUps((prev) => {
         const collidedPowerUp = prev.find((powerUp) => {
           const dx = mousePos.x - powerUp.position.x;
@@ -176,26 +243,6 @@ function App() {
         return prev;
       });
 
-      setPursuerPos((prev) => {
-        const dx = mousePos.x - prev.x;
-        const dy = mousePos.y - prev.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < 30) {
-          setGameState((prev) => ({
-            ...prev,
-            isGameOver: true,
-            isPlaying: false,
-          }));
-          return prev;
-        }
-
-        return {
-          x: prev.x + dx * gameState.difficulty * (deltaTime / 16),
-          y: prev.y + dy * gameState.difficulty * (deltaTime / 16),
-        };
-      });
-
       animationFrameRef.current = requestAnimationFrame(updateGame);
     };
 
@@ -214,7 +261,6 @@ function App() {
     gameState.score,
     mousePos,
     setGameState,
-    setPursuerPos,
     setPowerUps,
     spawnPowerUp,
   ]);
@@ -255,7 +301,13 @@ function App() {
 
       {gameState.isPlaying && (
         <>
-          <Pursuer x={pursuerPos.x} y={pursuerPos.y} />
+          {gameState.pursuers.map((pursuer) => (
+            <Pursuer
+              key={pursuer.id}
+              x={pursuer.position.x}
+              y={pursuer.position.y}
+            />
+          ))}
           {powerUps.map((powerUp) => (
             <PowerUp
               key={powerUp.id}
